@@ -88,7 +88,7 @@ The system consists of three main services:
 ```
 ## 🔌 API Responses
 
-### ➤ Submit Job Response
+### Submit Job Response
 
 ```json
 {
