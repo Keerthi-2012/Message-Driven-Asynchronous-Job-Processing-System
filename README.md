@@ -86,7 +86,7 @@ The system consists of three main services:
   "destination": "/local/path"
 }
 ```
-## 🔌 API Responses
+## API Responses
 
 ### Submit Job Response
 
