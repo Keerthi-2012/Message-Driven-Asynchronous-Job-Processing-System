@@ -70,11 +70,10 @@ The system consists of three main services:
 - **Docker & Docker Compose**
 - **AWS S3**
 
----
 
 ## API Endpoints
 
-### ➤ Submit Job
+### Submit Job
 
 **POST** `/jobs`
 
