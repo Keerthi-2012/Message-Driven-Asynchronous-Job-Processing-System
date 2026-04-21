@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+
+  activemq:
+    image: apache/activemq-classic:latest
+    container_name: activemq
+    ports:
+      - "61616:61616"
+      - "8161:8161"
+    networks:
+      - app-network
+
+  orchestrator:
+    build: ./orchestrator
+    container_name: orchestrator
+    ports:
+      - "8081:8081"
+    depends_on:
+      - activemq
+    environment:
+      - SPRING_ACTIVEMQ_BROKER_URL=tcp://activemq:61616
+      - SPRING_ACTIVEMQ_BROKERURL=tcp://activemq:61616
+    networks:
+      - app-network
+
+  worker:
+    build: ./worker
+    container_name: worker
+    ports:
+      - "8082:8082"
+    depends_on:
+      - activemq
+    environment:
+      - SPRING_ACTIVEMQ_BROKER_URL=tcp://activemq:61616
+      - SPRING_ACTIVEMQ_BROKERURL=tcp://activemq:61616
+    volumes:
+      - ./downloads:/downloads
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

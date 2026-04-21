@@ -1,0 +1,39 @@
+# Maven
+target/
+.classpath
+.project
+.settings/
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+out/
+build/
+dist/
+
+# Dependencies
+.m2/
+node_modules/
+
+# Local properties and secrets
+application-local.properties
+.env
+*.local
