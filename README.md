@@ -10,7 +10,6 @@ It demonstrates how to:
 
 Users can submit file copy jobs and monitor their progress while processing happens independently.
 
----
 
 ## Architecture
 
@@ -63,9 +62,8 @@ The system consists of three main services:
 - Supports file and folder downloads from S3  
 - In-memory job tracking (no database required)  
 
----
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Java (Spring Boot)**
 - **ActiveMQ**
