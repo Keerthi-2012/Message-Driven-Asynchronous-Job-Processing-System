@@ -85,3 +85,46 @@ The system consists of three main services:
   "path": "file-or-folder-path",
   "destination": "/local/path"
 }
+```
+## 🔌 API Responses
+
+### ➤ Submit Job Response
+
+```json
+{
+  "jobId": "12345",
+  "status": "SUBMITTED"
+}
+```
+Check Job Status
+
+GET /jobs/{jobId}
+
+Response (In Progress)
+```
+{
+  "jobId": "12345",
+  "status": "IN_PROGRESS"
+}
+```
+Response (Completed)
+```
+{
+  "jobId": "12345",
+  "status": "COMPLETED"
+}
+```
+How to Run:
+Make sure Docker is installed and running
+Navigate to the project root directory
+Run:
+```
+docker-compose up --build
+```
+Access the Orchestrator service:
+```
+http://localhost:8081
+```
+Use Postman or any HTTP client to:
+Submit jobs
+Check job status
