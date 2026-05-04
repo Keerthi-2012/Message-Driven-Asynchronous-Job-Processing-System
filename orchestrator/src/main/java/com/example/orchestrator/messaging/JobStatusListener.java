@@ -13,7 +13,7 @@ import java.time.Instant;
 public class JobStatusListener {
 
     @Autowired
-    private ObjectMapper objectMapper;  // ← injected, not new ObjectMapper()
+    private ObjectMapper objectMapper;
 
     @JmsListener(destination = "copy.job.status")
     public void handleJobStatus(String message) {
@@ -39,7 +39,7 @@ public class JobStatusListener {
 
         } catch (Exception e) {
             System.err.println("Error processing job status: " + e.getMessage());
-            e.printStackTrace();  // now you'll actually see what's failing
+            e.printStackTrace();
         }
     }
 }

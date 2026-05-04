@@ -17,10 +17,6 @@ public class JobController {
     @Autowired
     private JobService jobService;
 
-    /**
-     * Submit a new copy job
-     * POST /jobs
-     */
     @PostMapping
     public ResponseEntity<?> createJob(@RequestBody Job job) {
         Job createdJob = jobService.createJob(job);
@@ -33,10 +29,6 @@ public class JobController {
 
     }
 
-    /**
-     * Get job status
-     * GET /jobs/{jobId}
-     */
     @GetMapping("/{jobId}")
     public ResponseEntity<?> getJob(@PathVariable String jobId) {
         Job job = jobService.getJob(jobId);

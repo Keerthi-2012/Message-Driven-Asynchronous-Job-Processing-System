@@ -13,7 +13,6 @@ public class WorkerApplication {
     public static void main(String[] args) {
         cleanupTempFiles("/downloads");
 
-        // Shutdown hook - runs when worker is stopped gracefully
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Worker shutting down - cleaning up temp files...");
             cleanupTempFiles("/downloads");

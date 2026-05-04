@@ -24,7 +24,6 @@ public class JobService {
 
         JobStore.save(request);
 
-        // Publish job request to ActiveMQ for worker to process
         jobPublisher.publishJobRequest(request);
         System.out.println("Service HIT");
         return request;

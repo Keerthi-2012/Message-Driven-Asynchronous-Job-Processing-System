@@ -157,13 +157,10 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
 
             tempFile = destination.resolveSibling(destination.getFileName() + "." + Thread.currentThread().getId() + ".tmp");
 
-            // Download file and get response metadata
             GetObjectResponse response = s3.getObject(request, tempFile);
 
-            // Get ETag from S3 (MD5 hash for non-multipart uploads)
             String etag = response.eTag().replace("\"", "");
 
-            // Skip checksum for multipart uploads (etag contains "-")
             if (!etag.contains("-")) {
                 String localMd5 = calculateMd5(tempFile);
                 if (!etag.equalsIgnoreCase(localMd5)) {
@@ -171,7 +168,6 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
                 }
             }
 
-            // Validate file content based on extension
             validateFile(tempFile, key);
 
             Files.move(tempFile, destination, StandardCopyOption.REPLACE_EXISTING);
@@ -182,7 +178,6 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
         } catch (S3Exception e) {
             throw new Exception("S3 error for file " + key + ": " + e.awsErrorDetails().errorMessage());
         } finally {
-            // Cleanup temp file on any failure
             if (tempFile != null && Files.exists(tempFile)) {
                 Files.deleteIfExists(tempFile);
             }
@@ -199,7 +194,6 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
         } else if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
             validateImage(file, key);
         }
-        // other formats pass through without validation
     }
 
     private void validateZip(Path file, String key) throws Exception {
@@ -218,7 +212,6 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
         try (var is = Files.newInputStream(file)) {
             is.read(header);
         }
-        // PDF files always start with %PDF
         if (!new String(header).startsWith("%PDF")) {
             throw new Exception("Corrupt PDF file: " + key + " (invalid header)");
         }
@@ -232,13 +225,11 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
         }
         String lower = key.toLowerCase();
         if (lower.endsWith(".png")) {
-            // PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
             if (header[0] != (byte) 0x89 || header[1] != 0x50 ||
                 header[2] != 0x4E || header[3] != 0x47) {
                 throw new Exception("Corrupt PNG file: " + key + " (invalid header)");
             }
         } else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
-            // JPEG magic bytes: FF D8 FF
             if (header[0] != (byte) 0xFF || header[1] != (byte) 0xD8 ||
                 header[2] != (byte) 0xFF) {
                 throw new Exception("Corrupt JPEG file: " + key + " (invalid header)");
@@ -250,7 +241,7 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
     private String calculateMd5(Path file) throws Exception {
     MessageDigest md = MessageDigest.getInstance("MD5");
     try (var is = Files.newInputStream(file)) {
-        byte[] buffer = new byte[8192]; // ✅ 8KB chunks
+        byte[] buffer = new byte[8192]; 
         int bytesRead;
         while ((bytesRead = is.read(buffer)) != -1) {
             md.update(buffer, 0, bytesRead);

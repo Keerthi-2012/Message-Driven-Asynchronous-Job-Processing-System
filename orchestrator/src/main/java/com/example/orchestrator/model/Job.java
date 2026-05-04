@@ -14,7 +14,6 @@ public class Job {
     private Instant completedAt;
     private String message;
 
-    // Constructors
     public Job() {
     }
 
@@ -29,7 +28,6 @@ public class Job {
         this.completedAt = completedAt;
     }
 
-    // Getters and Setters
     public String getJobId() {
         return jobId;
     }

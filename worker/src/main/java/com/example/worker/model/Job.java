@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Instant;
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)  // safety net for any extra fields
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Job {
     private String jobId;
     private String bucketName;
@@ -18,7 +18,6 @@ public class Job {
 
     public Job() {}
 
-    // Getters and Setters
     public String getJobId() { return jobId; }
     public void setJobId(String jobId) { this.jobId = jobId; }
 
