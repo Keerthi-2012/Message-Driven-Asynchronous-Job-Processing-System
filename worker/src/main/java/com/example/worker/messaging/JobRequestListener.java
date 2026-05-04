@@ -96,9 +96,7 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
     List<String> failedFiles = new ArrayList<>();
     try {
         long maxFiles = 1000;
-        long maxBytes = 500L * 1024 * 1024;
         long fileCount = 0;
-        long totalBytes = 0;
 
         System.out.println("Starting folder download...");
         System.out.println("Prefix: " + (prefix.isEmpty() ? "entire bucket" : prefix));
@@ -123,11 +121,6 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
                     throw new Exception("Too many files: exceeded limit of " + maxFiles + " files");
                 }
 
-                totalBytes += s3Object.size();
-                if (totalBytes > maxBytes) {
-                    throw new Exception("Total download size exceeded limit of 500MB");
-                }
-
                 try {
                     System.out.println("File " + fileCount + ": " + key + " (" + s3Object.size() / (1024 * 1024) + " MB)");
                     downloadFile(s3, job.getBucketName(), key, job.getDestinationPath());
@@ -149,7 +142,7 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
         throw new Exception("S3 error for folder " + prefix + ": " + e.awsErrorDetails().errorMessage());
     }
 
-    return failedFiles; // ✅ return instead of throw
+    return failedFiles;
 }
     private void downloadFile(S3Client s3, String bucket, String key, String destinationBase) throws Exception {
         Path tempFile = null;
@@ -162,7 +155,7 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
             Path destination = Paths.get(destinationBase, key);
             Files.createDirectories(destination.getParent());
 
-            tempFile = destination.resolveSibling(destination.getFileName() + ".tmp");
+            tempFile = destination.resolveSibling(destination.getFileName() + "." + Thread.currentThread().getId() + ".tmp");
 
             // Download file and get response metadata
             GetObjectResponse response = s3.getObject(request, tempFile);
@@ -255,13 +248,19 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
     }
 
     private String calculateMd5(Path file) throws Exception {
-        MessageDigest md = MessageDigest.getInstance("MD5");
-        byte[] bytes = Files.readAllBytes(file);
-        byte[] hash = md.digest(bytes);
-        StringBuilder sb = new StringBuilder();
-        for (byte b : hash) {
-            sb.append(String.format("%02x", b));
+    MessageDigest md = MessageDigest.getInstance("MD5");
+    try (var is = Files.newInputStream(file)) {
+        byte[] buffer = new byte[8192]; // ✅ 8KB chunks
+        int bytesRead;
+        while ((bytesRead = is.read(buffer)) != -1) {
+            md.update(buffer, 0, bytesRead);
         }
-        return sb.toString();
     }
+    byte[] hash = md.digest();
+    StringBuilder sb = new StringBuilder();
+    for (byte b : hash) {
+        sb.append(String.format("%02x", b));
+    }
+    return sb.toString();
+}
 }
