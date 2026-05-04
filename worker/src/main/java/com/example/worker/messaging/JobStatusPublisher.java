@@ -12,7 +12,7 @@ public class JobStatusPublisher {
     private JmsTemplate jmsTemplate;
 
     @Autowired
-    private ObjectMapper objectMapper;  // ← injected, not new ObjectMapper()
+    private ObjectMapper objectMapper;  
 
     public void publishStatus(Job job) {
         try {

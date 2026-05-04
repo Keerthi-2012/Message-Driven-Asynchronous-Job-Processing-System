@@ -27,7 +27,7 @@ public class JobController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("jobId", createdJob.getJobId());
-        response.put("status", createdJob.getStatus());
+        response.put("status", "SUBMITTED");
         System.out.println("Controller HIT");
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
 

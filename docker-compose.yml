@@ -36,6 +36,9 @@ services:
       - SPRING_ACTIVEMQ_BROKERURL=tcp://activemq:61616
     volumes:
       - ./downloads:/downloads
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     networks:
       - app-network
 
