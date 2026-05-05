@@ -34,17 +34,20 @@ public class JobController {
         Job job = jobService.getJob(jobId);
 
         if (job == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new HashMap<String, String>() {{
-                put("error", "Job not found");
-            }});
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new HashMap<String, String>() {
+                {
+                    put("error", "Job not found");
+                }
+            });
         }
 
         Map<String, Object> response = new HashMap<>();
         response.put("jobId", job.getJobId());
         response.put("status", job.getStatus());
+        response.put("progress", job.getProgress() + "%");
 
         if (job.getCompletedAt() != null) {
-            response.put("completedAt", job.getCompletedAt());
+            response.put("completedAt", job.getCompletedAt().toString());
         }
 
         if (job.getMessage() != null) {
@@ -54,4 +57,3 @@ public class JobController {
         return ResponseEntity.ok(response);
     }
 }
-

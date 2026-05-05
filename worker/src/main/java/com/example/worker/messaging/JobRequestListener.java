@@ -31,119 +31,176 @@ public class JobRequestListener {
     private JobStatusPublisher publisher;
 
     @JmsListener(destination = "copy.job.request")
-public void processJob(String message) {
-    Job job = null;
-    try {
-        System.out.println("Worker received job!");
-        job = objectMapper.readValue(message, Job.class);
-        System.out.println("Processing: " + job.getJobId());
+    public void processJob(String message) {
+        Job job = null;
+        try {
+            System.out.println("Worker received job!");
+            job = objectMapper.readValue(message, Job.class);
+            System.out.println("Processing: " + job.getJobId());
 
-        job.setStatus("IN_PROGRESS");
-        job.setMessage("Download started");
-        publisher.publishStatus(job);
+            job.setStatus("IN_PROGRESS");
+            job.setMessage("Download started");
+            job.setProgress(0);
+            publisher.publishStatus(job);
 
-        List<String> failedFiles = downloadFromS3(job);
+            List<String> failedFiles = downloadFromS3(job);
 
-        if (failedFiles.isEmpty()) {
-            job.setStatus("COMPLETED");
-            job.setMessage("Download successful");
-        } else {
-            job.setStatus("COMPLETED_WITH_ERRORS");
-            job.setMessage("Download completed with errors. Failed files: " + failedFiles);
-        }
+            if (failedFiles.isEmpty()) {
+                job.setStatus("COMPLETED");
+                job.setMessage("Download successful");
+                job.setProgress(100);
+            } else {
+                job.setStatus("COMPLETED_WITH_ERRORS");
+                job.setMessage("Download completed with errors. Failed files: " + failedFiles);
+                job.setProgress(100);
+            }
 
-        job.setCompletedAt(Instant.now());
-        publisher.publishStatus(job);
-
-    } catch (Exception e) {
-        e.printStackTrace();
-        if (job != null) {
-            job.setStatus("FAILED");
-            job.setMessage(e.getMessage());
             job.setCompletedAt(Instant.now());
             publisher.publishStatus(job);
-        }
-    }
-}
-private List<String> downloadFromS3(Job job) throws Exception {
-    S3Client s3 = S3Client.builder()
-            .region(Region.of(job.getRegion()))
-            .credentialsProvider(AnonymousCredentialsProvider.create())
-            .build();
 
-    List<String> allFailedFiles = new ArrayList<>();
-
-    try {
-        for (String s3Path : job.getPaths()) {
-            if (s3Path == null || s3Path.isBlank()) {
-                throw new Exception("Invalid path: path cannot be empty");
-            } else if (s3Path.equals("/") || s3Path.equals("*") || s3Path.equals(".")) {
-                System.out.println("WARNING: Downloading entire bucket. This may be large.");
-                allFailedFiles.addAll(downloadFolder(s3, job, ""));
-            } else if (s3Path.endsWith("/")) {
-                allFailedFiles.addAll(downloadFolder(s3, job, s3Path));
-            } else {
-                downloadFile(s3, job.getBucketName(), s3Path, job.getDestinationPath());
+        } catch (Exception e) {
+            e.printStackTrace();
+            if (job != null) {
+                job.setStatus("FAILED");
+                job.setMessage(e.getMessage());
+                job.setCompletedAt(Instant.now());
+                publisher.publishStatus(job);
             }
         }
-    } finally {
-        s3.close();
     }
 
-    return allFailedFiles;
-}
-private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws Exception {
-    List<String> failedFiles = new ArrayList<>();
-    try {
-        long maxFiles = 1000;
-        long fileCount = 0;
-
-        System.out.println("Starting folder download...");
-        System.out.println("Prefix: " + (prefix.isEmpty() ? "entire bucket" : prefix));
-
-        ListObjectsV2Request listRequest = ListObjectsV2Request.builder()
-                .bucket(job.getBucketName())
-                .prefix(prefix)
+    private List<String> downloadFromS3(Job job) throws Exception {
+        S3Client s3 = S3Client.builder()
+                .region(Region.of(job.getRegion()))
+                .credentialsProvider(AnonymousCredentialsProvider.create())
                 .build();
 
-        ListObjectsV2Response listResponse = s3.listObjectsV2(listRequest);
+        List<String> allFailedFiles = new ArrayList<>();
 
-        if (listResponse.contents().isEmpty()) {
-            throw new Exception("No files found at path: " + prefix);
-        }
+        try {
+            List<String> paths = job.getPaths();
+            int totalPaths = paths.size();
+            int processedPaths = 0;
 
-        while (true) {
-            for (S3Object s3Object : listResponse.contents()) {
-                String key = s3Object.key();
-                if (key.endsWith("/") || key.isBlank()) continue;
+            for (String s3Path : paths) {
+                if (s3Path == null || s3Path.isBlank()) {
+                    throw new Exception("Invalid path: path cannot be empty");
+                } else if (s3Path.equals("/") || s3Path.equals("*") || s3Path.equals(".")) {
+                    System.out.println("WARNING: Downloading entire bucket. This may be large.");
+                    allFailedFiles.addAll(downloadFolder(s3, job, ""));
+                } else if (s3Path.endsWith("/")) {
+                    allFailedFiles.addAll(downloadFolder(s3, job, s3Path));
+                } else {
+                    // Single file — publish progress
+                    job.setProgress(0);
+                    job.setMessage("Downloading file: " + s3Path);
+                    publisher.publishStatus(job);
 
-                if (++fileCount > maxFiles) {
-                    throw new Exception("Too many files: exceeded limit of " + maxFiles + " files");
-                }
-
-                try {
-                    System.out.println("File " + fileCount + ": " + key + " (" + s3Object.size() / (1024 * 1024) + " MB)");
-                    downloadFile(s3, job.getBucketName(), key, job.getDestinationPath());
-                } catch (Exception e) {
-                    System.out.println("Skipping corrupt/failed file: " + key + " → " + e.getMessage());
-                    failedFiles.add(key);
+                    try {
+                        downloadFile(s3, job.getBucketName(), s3Path, job.getDestinationPath());
+                        processedPaths++;
+                        int progress = (int) ((processedPaths * 100) / totalPaths);
+                        job.setProgress(progress);
+                        job.setMessage("Downloaded: " + s3Path + " (" + processedPaths + "/" + totalPaths + " files)");
+                        publisher.publishStatus(job);
+                    } catch (Exception e) {
+                        allFailedFiles.add(s3Path);
+                        processedPaths++;
+                        System.out.println("Skipping corrupt/failed file: " + s3Path + " → " + e.getMessage());
+                    }
                 }
             }
-
-            if (!listResponse.isTruncated()) break;
-
-            listRequest = listRequest.toBuilder()
-                    .continuationToken(listResponse.nextContinuationToken())
-                    .build();
-            listResponse = s3.listObjectsV2(listRequest);
+        } finally {
+            s3.close();
         }
 
-    } catch (S3Exception e) {
-        throw new Exception("S3 error for folder " + prefix + ": " + e.awsErrorDetails().errorMessage());
+        return allFailedFiles;
     }
 
-    return failedFiles;
-}
+    private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws Exception {
+        List<String> failedFiles = new ArrayList<>();
+        try {
+            long maxFiles = 1000;
+            long fileCount = 0;
+
+            System.out.println("Starting folder download...");
+            System.out.println("Prefix: " + (prefix.isEmpty() ? "entire bucket" : prefix));
+
+            ListObjectsV2Request listRequest = ListObjectsV2Request.builder()
+                    .bucket(job.getBucketName())
+                    .prefix(prefix)
+                    .build();
+
+            ListObjectsV2Response listResponse = s3.listObjectsV2(listRequest);
+
+            if (listResponse.contents().isEmpty()) {
+                throw new Exception("No files found at path: " + prefix);
+            }
+
+            // Count total files across all pages first
+            long totalFiles = listResponse.contents().stream()
+                    .filter(o -> !o.key().endsWith("/") && !o.key().isBlank())
+                    .count();
+
+            ListObjectsV2Response tempResponse = listResponse;
+            while (tempResponse.isTruncated()) {
+                ListObjectsV2Request tempRequest = listRequest.toBuilder()
+                        .continuationToken(tempResponse.nextContinuationToken())
+                        .build();
+                tempResponse = s3.listObjectsV2(tempRequest);
+                totalFiles += tempResponse.contents().stream()
+                        .filter(o -> !o.key().endsWith("/") && !o.key().isBlank())
+                        .count();
+            }
+
+            System.out.println("Total files to download: " + totalFiles);
+            long processedFiles = 0;
+
+            // Reset to first page
+            listResponse = s3.listObjectsV2(listRequest);
+
+            while (true) {
+                for (S3Object s3Object : listResponse.contents()) {
+                    String key = s3Object.key();
+                    if (key.endsWith("/") || key.isBlank()) continue;
+
+                    if (++fileCount > maxFiles) {
+                        throw new Exception("Too many files: exceeded limit of " + maxFiles + " files");
+                    }
+
+                    try {
+                        System.out.println("File " + fileCount + ": " + key + " (" +
+                                String.format("%.2f", s3Object.size() / (1024.0 * 1024.0)) + " MB)");
+                        downloadFile(s3, job.getBucketName(), key, job.getDestinationPath());
+                    } catch (Exception e) {
+                        System.out.println("Skipping corrupt/failed file: " + key + " → " + e.getMessage());
+                        failedFiles.add(key);
+                    }
+
+                    // Calculate and publish progress
+                    processedFiles++;
+                    int progress = (int) ((processedFiles * 100) / totalFiles);
+                    job.setProgress(progress);
+                    job.setMessage("Downloading... " + progress + "% (" + processedFiles + "/" + totalFiles + " files)");
+                    publisher.publishStatus(job);
+                    System.out.println("Progress: " + progress + "% (" + processedFiles + "/" + totalFiles + ")");
+                }
+
+                if (!listResponse.isTruncated()) break;
+
+                listRequest = listRequest.toBuilder()
+                        .continuationToken(listResponse.nextContinuationToken())
+                        .build();
+                listResponse = s3.listObjectsV2(listRequest);
+            }
+
+        } catch (S3Exception e) {
+            throw new Exception("S3 error for folder " + prefix + ": " + e.awsErrorDetails().errorMessage());
+        }
+
+        return failedFiles;
+    }
+
     private void downloadFile(S3Client s3, String bucket, String key, String destinationBase) throws Exception {
         Path tempFile = null;
         try {
@@ -155,12 +212,16 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
             Path destination = Paths.get(destinationBase, key);
             Files.createDirectories(destination.getParent());
 
-            tempFile = destination.resolveSibling(destination.getFileName() + "." + Thread.currentThread().getId() + ".tmp");
+            tempFile = destination.resolveSibling(
+                    destination.getFileName() + "." + Thread.currentThread().getId() + ".tmp");
 
+            // Download file and get response metadata
             GetObjectResponse response = s3.getObject(request, tempFile);
 
+            // Get ETag from S3 (MD5 hash for non-multipart uploads)
             String etag = response.eTag().replace("\"", "");
 
+            // Skip checksum for multipart uploads (etag contains "-")
             if (!etag.contains("-")) {
                 String localMd5 = calculateMd5(tempFile);
                 if (!etag.equalsIgnoreCase(localMd5)) {
@@ -168,6 +229,7 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
                 }
             }
 
+            // Validate file content based on extension
             validateFile(tempFile, key);
 
             Files.move(tempFile, destination, StandardCopyOption.REPLACE_EXISTING);
@@ -178,6 +240,7 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
         } catch (S3Exception e) {
             throw new Exception("S3 error for file " + key + ": " + e.awsErrorDetails().errorMessage());
         } finally {
+            // Cleanup temp file on any failure
             if (tempFile != null && Files.exists(tempFile)) {
                 Files.deleteIfExists(tempFile);
             }
@@ -226,12 +289,12 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
         String lower = key.toLowerCase();
         if (lower.endsWith(".png")) {
             if (header[0] != (byte) 0x89 || header[1] != 0x50 ||
-                header[2] != 0x4E || header[3] != 0x47) {
+                    header[2] != 0x4E || header[3] != 0x47) {
                 throw new Exception("Corrupt PNG file: " + key + " (invalid header)");
             }
         } else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
             if (header[0] != (byte) 0xFF || header[1] != (byte) 0xD8 ||
-                header[2] != (byte) 0xFF) {
+                    header[2] != (byte) 0xFF) {
                 throw new Exception("Corrupt JPEG file: " + key + " (invalid header)");
             }
         }
@@ -239,19 +302,19 @@ private List<String> downloadFolder(S3Client s3, Job job, String prefix) throws 
     }
 
     private String calculateMd5(Path file) throws Exception {
-    MessageDigest md = MessageDigest.getInstance("MD5");
-    try (var is = Files.newInputStream(file)) {
-        byte[] buffer = new byte[8192]; 
-        int bytesRead;
-        while ((bytesRead = is.read(buffer)) != -1) {
-            md.update(buffer, 0, bytesRead);
+        MessageDigest md = MessageDigest.getInstance("MD5");
+        try (var is = Files.newInputStream(file)) {
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                md.update(buffer, 0, bytesRead);
+            }
         }
+        byte[] hash = md.digest();
+        StringBuilder sb = new StringBuilder();
+        for (byte b : hash) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
     }
-    byte[] hash = md.digest();
-    StringBuilder sb = new StringBuilder();
-    for (byte b : hash) {
-        sb.append(String.format("%02x", b));
-    }
-    return sb.toString();
-}
 }

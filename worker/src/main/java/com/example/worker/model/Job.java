@@ -15,33 +15,88 @@ public class Job {
     private String message;
     private Instant createdAt;
     private Instant completedAt;
+    private int progress; 
 
-    public Job() {}
+    public int getProgress() {
+        return progress;
+    }
 
-    public String getJobId() { return jobId; }
-    public void setJobId(String jobId) { this.jobId = jobId; }
+    public void setProgress(int progress) {
+        this.progress = progress;
+    }
 
-    public String getBucketName() { return bucketName; }
-    public void setBucketName(String bucketName) { this.bucketName = bucketName; }
+    public Job() {
+    }
 
-    public String getRegion() { return region; }
-    public void setRegion(String region) { this.region = region; }
+    public String getJobId() {
+        return jobId;
+    }
 
-    public List<String> getPaths() { return paths; }
-    public void setPaths(List<String> paths) { this.paths = paths; }
+    public void setJobId(String jobId) {
+        this.jobId = jobId;
+    }
 
-    public String getDestinationPath() { return destinationPath; }
-    public void setDestinationPath(String destinationPath) { this.destinationPath = destinationPath; }
+    public String getBucketName() {
+        return bucketName;
+    }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public void setBucketName(String bucketName) {
+        this.bucketName = bucketName;
+    }
 
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
+    public String getRegion() {
+        return region;
+    }
 
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public void setRegion(String region) {
+        this.region = region;
+    }
 
-    public Instant getCompletedAt() { return completedAt; }
-    public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
+    public List<String> getPaths() {
+        return paths;
+    }
+
+    public void setPaths(List<String> paths) {
+        this.paths = paths;
+    }
+
+    public String getDestinationPath() {
+        return destinationPath;
+    }
+
+    public void setDestinationPath(String destinationPath) {
+        this.destinationPath = destinationPath;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getCompletedAt() {
+        return completedAt;
+    }
+
+    public void setCompletedAt(Instant completedAt) {
+        this.completedAt = completedAt;
+    }
 }

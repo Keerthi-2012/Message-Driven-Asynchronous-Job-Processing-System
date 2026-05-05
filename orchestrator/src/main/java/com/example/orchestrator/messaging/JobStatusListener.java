@@ -26,13 +26,16 @@ public class JobStatusListener {
             if (existingJob != null) {
                 existingJob.setStatus(statusUpdate.getStatus());
                 existingJob.setMessage(statusUpdate.getMessage());
+                existingJob.setProgress(statusUpdate.getProgress()); // save progress
 
-                if ("COMPLETED".equals(statusUpdate.getStatus())) {
+                if ("COMPLETED".equals(statusUpdate.getStatus()) ||
+                    "COMPLETED_WITH_ERRORS".equals(statusUpdate.getStatus()) ||
+                    "FAILED".equals(statusUpdate.getStatus())) {
                     existingJob.setCompletedAt(Instant.now());
                 }
 
                 JobStore.save(existingJob);
-                System.out.println("Job " + statusUpdate.getJobId() + " updated to: " + statusUpdate.getStatus());
+                System.out.println("Job " + statusUpdate.getJobId() + " updated to: " + statusUpdate.getStatus() + " (" + statusUpdate.getProgress() + "%)");
             } else {
                 System.err.println("Job not found in store: " + statusUpdate.getJobId());
             }
