@@ -30,6 +30,8 @@ public class JobRequestListener {
     @Autowired
     private JobStatusPublisher publisher;
 
+    private static final int MAX_RETRIES = 3;
+
     @JmsListener(destination = "copy.job.request")
     public void processJob(String message) {
         Job job = null;
@@ -91,22 +93,39 @@ public class JobRequestListener {
                 } else if (s3Path.endsWith("/")) {
                     allFailedFiles.addAll(downloadFolder(s3, job, s3Path));
                 } else {
-                    // Single file — publish progress
+                    // Single file with retry
                     job.setProgress(0);
                     job.setMessage("Downloading file: " + s3Path);
                     publisher.publishStatus(job);
 
-                    try {
-                        downloadFile(s3, job.getBucketName(), s3Path, job.getDestinationPath());
-                        processedPaths++;
-                        int progress = (int) ((processedPaths * 100) / totalPaths);
-                        job.setProgress(progress);
-                        job.setMessage("Downloaded: " + s3Path + " (" + processedPaths + "/" + totalPaths + " files)");
-                        publisher.publishStatus(job);
-                    } catch (Exception e) {
-                        allFailedFiles.add(s3Path);
-                        processedPaths++;
-                        System.out.println("Skipping corrupt/failed file: " + s3Path + " → " + e.getMessage());
+                    int attempt = 0;
+                    boolean downloaded = false;
+
+                    while (attempt < MAX_RETRIES && !downloaded) {
+                        try {
+                            attempt++;
+                            System.out.println("Attempt " + attempt + " for: " + s3Path);
+                            downloadFile(s3, job.getBucketName(), s3Path, job.getDestinationPath());
+                            downloaded = true;
+                            processedPaths++;
+                            int progress = (int) ((processedPaths * 100) / totalPaths);
+                            job.setProgress(progress);
+                            job.setMessage("Downloaded: " + s3Path + " (" + processedPaths + "/" + totalPaths + " files)");
+                            publisher.publishStatus(job);
+                        } catch (Exception e) {
+                            System.out.println("Attempt " + attempt + " failed for: " + s3Path + " → " + e.getMessage());
+                            if (attempt >= MAX_RETRIES) {
+                                System.out.println("Max retries reached for: " + s3Path + " → skipping");
+                                allFailedFiles.add(s3Path);
+                                processedPaths++;
+                            } else {
+                                try {
+                                    Thread.sleep(2000L * attempt); // 2s, 4s backoff
+                                } catch (InterruptedException ie) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -137,7 +156,7 @@ public class JobRequestListener {
                 throw new Exception("No files found at path: " + prefix);
             }
 
-            // Count total files across all pages first
+            // Count total files across all pages
             long totalFiles = listResponse.contents().stream()
                     .filter(o -> !o.key().endsWith("/") && !o.key().isBlank())
                     .count();
@@ -168,16 +187,33 @@ public class JobRequestListener {
                         throw new Exception("Too many files: exceeded limit of " + maxFiles + " files");
                     }
 
-                    try {
-                        System.out.println("File " + fileCount + ": " + key + " (" +
-                                String.format("%.2f", s3Object.size() / (1024.0 * 1024.0)) + " MB)");
-                        downloadFile(s3, job.getBucketName(), key, job.getDestinationPath());
-                    } catch (Exception e) {
-                        System.out.println("Skipping corrupt/failed file: " + key + " → " + e.getMessage());
-                        failedFiles.add(key);
+                    // ✅ Retry logic for each file
+                    int attempt = 0;
+                    boolean downloaded = false;
+
+                    while (attempt < MAX_RETRIES && !downloaded) {
+                        try {
+                            attempt++;
+                            System.out.println("Attempt " + attempt + " — File " + fileCount + ": " + key + " (" +
+                                    String.format("%.2f", s3Object.size() / (1024.0 * 1024.0)) + " MB)");
+                            downloadFile(s3, job.getBucketName(), key, job.getDestinationPath());
+                            downloaded = true;
+                        } catch (Exception e) {
+                            System.out.println("Attempt " + attempt + " failed for: " + key + " → " + e.getMessage());
+                            if (attempt >= MAX_RETRIES) {
+                                System.out.println("Max retries reached for: " + key + " → skipping");
+                                failedFiles.add(key);
+                            } else {
+                                try {
+                                    Thread.sleep(2000L * attempt); // 2s, 4s backoff
+                                } catch (InterruptedException ie) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            }
+                        }
                     }
 
-                    // Calculate and publish progress
+                    // ✅ Update progress after each file (success or skip)
                     processedFiles++;
                     int progress = (int) ((processedFiles * 100) / totalFiles);
                     job.setProgress(progress);
@@ -240,7 +276,6 @@ public class JobRequestListener {
         } catch (S3Exception e) {
             throw new Exception("S3 error for file " + key + ": " + e.awsErrorDetails().errorMessage());
         } finally {
-            // Cleanup temp file on any failure
             if (tempFile != null && Files.exists(tempFile)) {
                 Files.deleteIfExists(tempFile);
             }
@@ -249,7 +284,6 @@ public class JobRequestListener {
 
     private void validateFile(Path file, String key) throws Exception {
         String lower = key.toLowerCase();
-
         if (lower.endsWith(".zip")) {
             validateZip(file, key);
         } else if (lower.endsWith(".pdf")) {
