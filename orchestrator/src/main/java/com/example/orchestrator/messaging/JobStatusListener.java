@@ -26,7 +26,7 @@ public class JobStatusListener {
             if (existingJob != null) {
                 existingJob.setStatus(statusUpdate.getStatus());
                 existingJob.setMessage(statusUpdate.getMessage());
-                existingJob.setProgress(statusUpdate.getProgress()); // save progress
+                existingJob.setProgress(statusUpdate.getProgress());
 
                 if ("COMPLETED".equals(statusUpdate.getStatus()) ||
                     "COMPLETED_WITH_ERRORS".equals(statusUpdate.getStatus()) ||

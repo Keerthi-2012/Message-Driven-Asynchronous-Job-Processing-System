@@ -162,7 +162,6 @@ public class JobRequestListener {
 
         log.info("Starting folder download | prefix={}", prefix.isEmpty() ? "entire bucket" : prefix);
 
-        // ✅ Load already completed files from checkpoint
         Set<String> completedFiles = checkpointManager.loadCompletedFiles(job.getJobId());
         if (!completedFiles.isEmpty()) {
             log.info("Resuming job {} — already completed {} files", job.getJobId(), completedFiles.size());
@@ -179,7 +178,6 @@ public class JobRequestListener {
             throw new Exception("No files found at path: " + prefix);
         }
 
-        // Count total files
         long totalFiles = listResponse.contents().stream()
                 .filter(o -> !o.key().endsWith("/") && !o.key().isBlank())
                 .count();
@@ -197,10 +195,8 @@ public class JobRequestListener {
 
         log.info("Total files to download: {}", totalFiles);
 
-        // ✅ Start processedFiles from already completed count
         long processedFiles = completedFiles.size();
 
-        // Reset to first page
         listResponse = s3.listObjectsV2(listRequest);
 
         while (true) {
@@ -212,13 +208,11 @@ public class JobRequestListener {
                     throw new Exception("Too many files: exceeded limit of " + maxFiles + " files");
                 }
 
-                // ✅ Skip already downloaded files
                 if (checkpointManager.isFileCompleted(job.getJobId(), key)) {
                     log.info("Skipping already downloaded file: {}", key);
                     continue;
                 }
 
-                // Retry logic
                 int attempt = 0;
                 boolean downloaded = false;
 
@@ -231,7 +225,6 @@ public class JobRequestListener {
                         downloadFile(s3, job.getBucketName(), key, job.getDestinationPath());
                         downloaded = true;
 
-                        // ✅ Save checkpoint after successful download
                         checkpointManager.markFileCompleted(job.getJobId(), key);
 
                     } catch (Exception e) {
@@ -249,7 +242,6 @@ public class JobRequestListener {
                     }
                 }
 
-                // Update progress
                 processedFiles++;
                 int progress = (int) ((processedFiles * 100) / totalFiles);
                 job.setProgress(progress);

@@ -18,7 +18,6 @@ public class CheckpointManager {
     private static final String CHECKPOINT_DIR = "/downloads/.checkpoints";
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // ✅ Save a completed file to checkpoint
     public void markFileCompleted(String jobId, String fileKey) {
         try {
             Path checkpointFile = getCheckpointPath(jobId);
@@ -34,12 +33,10 @@ public class CheckpointManager {
         }
     }
 
-    // ✅ Check if file already downloaded
     public boolean isFileCompleted(String jobId, String fileKey) {
         return loadCompletedFiles(jobId).contains(fileKey);
     }
 
-    // ✅ Load completed files for a job
     public Set<String> loadCompletedFiles(String jobId) {
         try {
             Path checkpointFile = getCheckpointPath(jobId);
@@ -55,7 +52,6 @@ public class CheckpointManager {
         return new HashSet<>();
     }
 
-    // ✅ Delete checkpoint when job is done
     public void clearCheckpoint(String jobId) {
         try {
             Path checkpointFile = getCheckpointPath(jobId);

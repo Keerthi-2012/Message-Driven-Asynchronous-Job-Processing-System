@@ -13,7 +13,7 @@ public class Job {
     private Instant createdAt;
     private Instant completedAt;
     private String message;
-    private int progress; // ✅ added
+    private int progress;
 
     public Job() {
     }
